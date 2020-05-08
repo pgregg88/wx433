@@ -1,4 +1,4 @@
-
+//changeme
 #define DEBUG  // Controls print statements. Comment out for production
 #define DEBUG_BAT  // Controls LED blinks for battery operation debug. Comment out for production
 #define MY_DEBUG  //Controls logging of protocol messages. Comment out for production
