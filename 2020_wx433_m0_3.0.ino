@@ -1,8 +1,8 @@
 
 #define DEBUG  // Controls print statements. Comment out for production
 #define DEBUG_BAT  // Controls LED blinks for battery operation debug. Comment out for production
-#define MY_DEBUG  //Controls logging of protocol messages. Comment out for production
-#define MY_DEBUG_VERBOSE_RFM69 //Controls logging  of radio messages. Comment out for production
+//#define MY_DEBUG  //Controls logging of protocol messages. Comment out for production
+//#define MY_DEBUG_VERBOSE_RFM69 //Controls logging  of radio messages. Comment out for production
 
 // Configure RFM69 Radio
 #define MY_RADIO_RFM69
@@ -22,7 +22,7 @@
 // Parent is always my gateway.  No need to search
 #define MY_PARENT_NODE_ID 0
 #define MY_PARENT_NODE_IS_STATIC
-#define MY_NODE_ID 7 // Manually assigned node ID for this device.  AUTO not supported if using MQTT
+#define MY_NODE_ID 71 // Manually assigned node ID for this device.  AUTO not supported if using MQTT
 #define BARO_CHILD 1
 #define TEMP_CHILD 2
 #define HUM_CHILD 3
@@ -79,7 +79,7 @@ void setup()
   LowPower.attachInterruptWakeup(RTC_ALARM_WAKEUP, awake, CHANGE);
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
-  
+
   //SerialUSB does not work when sleeping the Moteino M0 board.
   // Blinking LED was used in debug mode.
 #ifdef DEBUG
@@ -104,17 +104,14 @@ void presentation()
 #ifdef DEBUG
   Serial.println("Sending Presentation Info");
 #endif
-  sendSketchInfo("wx433_v3.0", "3.0");   //Max 25 characters.  Optional to do.
+  sendSketchInfo("windx", "1.0");   //Max 25 characters.  Optional to do.
   // Use one child per measurement for consistent HA entity naming.
-  present(TEMP_CHILD, S_CUSTOM);
-  present(HUM_CHILD, S_CUSTOM);
-  present(BARO_CHILD, S_CUSTOM);
-  present(VOLT_CHILD, S_CUSTOM);
+  present(TEMP_CHILD, S_TEMP);
+  present(HUM_CHILD, S_HUM);
+  present(BARO_CHILD, S_BARO);
+  present(VOLT_CHILD, S_MULTIMETER);
+
 }
-
-
-
-
 
 void loop()
 {
@@ -133,11 +130,12 @@ void loop()
   Serial.println(endTime - startTime);
 #endif
   float temperature = mySensor.readTempC();
-  float humidity = mySensor.readFloatHumidity();
-  float pressure = mySensor.readFloatPressure() / 100.0;
-  float battery = analogRead(BATTERY_PIN);
+  // float humidity = mySensor.readFloatHumidity();
+  // float pressure = mySensor.readFloatPressure() / 100.0;
+  // float battery = analogRead(BATTERY_PIN);
   //Reads approx 620 per volt, 4095/3.3/2
   battery = battery / 625.0; //My calibration
+
 #ifdef DEBUG
   Serial.print(" Temp: ");
   Serial.print(temperature);
@@ -157,6 +155,9 @@ void loop()
     #endif
     #ifdef DEBUG_BAT
       send(tempMsg.set(temperature, 1));
+      send(pressureMsg.set(pressure, 1));
+      send(voltageMsg.set(battery, 2));
+      send(humMsg.set(humidity, 2));
     #endif   
     // To Save power only send message on changed values
     if (abs(temperature - lastTemperature) > 0.1)
@@ -166,7 +167,7 @@ void loop()
     }
     if (abs(humidity - lastHumidity) > 1.0)
     {
-    send(humMsg.set(humidity, 0));
+    send(humMsg.set(humidity, 2));
     lastHumidity = humidity;
     }
 
