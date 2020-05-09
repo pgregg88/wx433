@@ -130,9 +130,9 @@ void loop()
   Serial.println(endTime - startTime);
 #endif
   float temperature = mySensor.readTempC();
-  // float humidity = mySensor.readFloatHumidity();
-  // float pressure = mySensor.readFloatPressure() / 100.0;
-  // float battery = analogRead(BATTERY_PIN);
+  float humidity = mySensor.readFloatHumidity();
+  float pressure = mySensor.readFloatPressure() / 100.0;
+  float battery = analogRead(BATTERY_PIN);
   //Reads approx 620 per volt, 4095/3.3/2
   battery = battery / 625.0; //My calibration
 
