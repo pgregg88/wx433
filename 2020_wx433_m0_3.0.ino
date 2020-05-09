@@ -3,6 +3,7 @@
 #define DEBUG_BAT  // Controls LED blinks for battery operation debug. Comment out for production
 //#define MY_DEBUG  //Controls logging of protocol messages. Comment out for production
 //#define MY_DEBUG_VERBOSE_RFM69 //Controls logging  of radio messages. Comment out for production
+//#define LOWPOWER_SLEEP // enables lowpower sleep. Don't use if you need to listen for radio messages
 
 // Configure RFM69 Radio
 #define MY_RADIO_RFM69
@@ -34,8 +35,9 @@
 #include <MySensors.h>
 #include <Wire.h>
 #include <SparkFunBME280.h>
+#ifdef LOWPOWER_SLEEP
 #include <ArduinoLowPower.h>
-
+#endif
 // Define variables to use later
 bool initialValueSent = false;
 volatile bool awakeFlag = false; 
@@ -76,7 +78,10 @@ void setup()
   pinMode(A2, OUTPUT);  //Used for RFM69 CS (NSS)
   //Setup ADC. Arduino default is 10 bits
   analogReadResolution(12);
+  #ifdef LOWPOWER_SLEEP
+
   LowPower.attachInterruptWakeup(RTC_ALARM_WAKEUP, awake, CHANGE);
+  #endif
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
 
@@ -130,9 +135,9 @@ void loop()
   Serial.println(endTime - startTime);
 #endif
   float temperature = mySensor.readTempC();
-  // float humidity = mySensor.readFloatHumidity();
-  // float pressure = mySensor.readFloatPressure() / 100.0;
-  // float battery = analogRead(BATTERY_PIN);
+  float humidity = mySensor.readFloatHumidity();
+  float pressure = mySensor.readFloatPressure() / 100.0;
+  float battery = analogRead(BATTERY_PIN);
   //Reads approx 620 per volt, 4095/3.3/2
   battery = battery / 625.0; //My calibration
 
@@ -200,6 +205,8 @@ void loop()
   //Read current mode of radio
   // byte rfmOpMode = readRegister(0x01);
 
+#ifdef LOWPOWER_SLEEP
+
   // Sleeping Radio
   writeRegister(0x01, 0x00);
   // Arduino Sleep
@@ -209,6 +216,7 @@ void loop()
   wait(10); //Some settle time before sleeping
   LowPower.deepSleep(sleepTime);
   wait(10);
+#endif
 #endif
   // Restoring Radio to Listen Mode
   writeRegister(0x01, 0x10);
