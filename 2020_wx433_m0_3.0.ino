@@ -4,7 +4,8 @@
 //#define MY_DEBUG  //Controls logging of protocol messages. Comment out for production
 //#define MY_DEBUG_VERBOSE_RFM69 //Controls logging  of radio messages. Comment out for production
 //#define LOWPOWER_SLEEP // enables lowpower sleep. Don't use if you need to listen for radio messages
-//#define ENABLE_MYSENSORS
+#define ENABLE_MYSENSORS // Enables MySensors radio communication with the gateway
+#define ENABLE_BME280 // Enables BME280 sensor [not complete]
 
 #ifdef ENABLE_MYSENSORS
   // Configure RFM69 Radio
@@ -40,7 +41,9 @@
   #include <MySensors.h>
 #endif
 #include <Wire.h>
-#include <SparkFunBME280.h>
+#ifdef ENABLE_BME280
+  #include <SparkFunBME280.h>
+#endif
 #ifdef LOWPOWER_SLEEP
   #include <ArduinoLowPower.h>
 #endif
@@ -52,6 +55,7 @@ volatile bool awakeFlag = false;
 #else
   unsigned long sleepTime = 300000; // Update every 5 minutes
 #endif
+
 float lastTemperature = 0;
 float lastPressure = 0;
 float lastHumidity = 0;
@@ -66,7 +70,9 @@ float lastBattery = 0;
   MyMessage voltageMsg(VOLT_CHILD, V_VOLTAGE);
 #endif
 
-BME280 myBME280; //Global sensor object
+#ifdef ENABLE_BME280
+  BME280 myBME280; //Global sensor object
+#endif
 
 //replace Serial with SerialUSB
 #if defined (MOTEINO_M0)
@@ -103,6 +109,7 @@ void setup()
   Wire.begin();
   Wire.setClock(400000); //Increase to fast I2C speed!
 
+#ifdef ENABLE_BME280
   myBME280.beginI2C();
   // Use same settings as Micro Python version
   myBME280.settings.filter = 3;
@@ -111,6 +118,7 @@ void setup()
   myBME280.settings.humidOverSample = 2;
 
   myBME280.setMode(MODE_SLEEP); //Sleep for now
+#endif
 }
 
 #ifdef ENABLE_MYSENSORS
@@ -130,34 +138,38 @@ void setup()
 
 void loop()
 {
-  myBME280.setMode(MODE_FORCED); //Wake up sensor and take reading
+  #ifdef ENABLE_BME280
+    myBME280.setMode(MODE_FORCED); //Wake up sensor and take reading
+    #ifdef DEBUG
+    long startTime = millis();
+    #endif
+    while (myBME280.isMeasuring() == false) ; //Wait for sensor to start measurment
+    while (myBME280.isMeasuring() == true) ; //Hang out while sensor completes the reading
   #ifdef DEBUG
-  long startTime = millis();
+    long endTime = millis();
+
+    //Sensor is back from sleep so we can now get the data
+
+    Serial.print(" Measure time(ms): ");
+    Serial.println(endTime - startTime);
   #endif
-  while (myBME280.isMeasuring() == false) ; //Wait for sensor to start measurment
-  while (myBME280.isMeasuring() == true) ; //Hang out while sensor completes the reading
-#ifdef DEBUG
-  long endTime = millis();
-
-  //Sensor is back from sleep so we can now get the data
-
-  Serial.print(" Measure time(ms): ");
-  Serial.println(endTime - startTime);
-#endif
-  float temperature = myBME280.readTempC();
-  float humidity = myBME280.readFloatHumidity();
-  float pressure = myBME280.readFloatPressure() / 100.0;
-  float battery = analogRead(BATTERY_PIN);
+    float temperature = myBME280.readTempC();
+    float humidity = myBME280.readFloatHumidity();
+    float pressure = myBME280.readFloatPressure() / 100.0;
+    float battery = analogRead(BATTERY_PIN);
+  #endif
   //Reads approx 620 per volt, 4095/3.3/2
   battery = battery / 625.0; //My calibration
 
 #ifdef DEBUG
-  Serial.print(" Temp: ");
-  Serial.print(temperature);
-  Serial.print(" Humidity: ");
-  Serial.print(humidity);
-  Serial.print(" Pressure: ");
-  Serial.print(pressure);
+  #ifdef ENABLE_BME280
+    Serial.print(" Temp: ");
+    Serial.print(temperature);
+    Serial.print(" Humidity: ");
+    Serial.print(humidity);
+    Serial.print(" Pressure: ");
+    Serial.print(pressure);
+  #endif
   Serial.print(" Battery Voltage ");
   Serial.println(battery);
 #endif
@@ -170,29 +182,32 @@ void loop()
       send(tempMsg.set(temperature, 1));
     #endif
     #ifdef DEBUG_BAT
-      send(tempMsg.set(temperature, 1));
-      send(pressureMsg.set(pressure, 1));
+      #ifdef ENABLE_BME280
+        send(tempMsg.set(temperature, 1));
+        send(pressureMsg.set(pressure, 1));
+        send(humMsg.set(humidity, 2));
+      #endif
       send(voltageMsg.set(battery, 2));
-      send(humMsg.set(humidity, 2));
     #endif   
     // To Save power only send message on changed values
-    if (abs(temperature - lastTemperature) > 0.5)
-    {
-    send(tempMsg.set(temperature, 1));
-    lastTemperature = temperature;
-    }
-    if (abs(humidity - lastHumidity) > 1.0)
-    {
-    send(humMsg.set(humidity, 2));
-    lastHumidity = humidity;
-    }
+    #ifdef ENABLE_BME280
+      if (abs(temperature - lastTemperature) > 0.5)
+      {
+      send(tempMsg.set(temperature, 1));
+      lastTemperature = temperature;
+      }
+      if (abs(humidity - lastHumidity) > 1.0)
+      {
+      send(humMsg.set(humidity, 2));
+      lastHumidity = humidity;
+      }
 
-    if (abs(pressure - lastPressure) > 1.0)
-    {
-    send(pressureMsg.set(pressure, 1));
-    lastPressure = pressure;
-    }
-
+      if (abs(pressure - lastPressure) > 1.0)
+      {
+      send(pressureMsg.set(pressure, 1));
+      lastPressure = pressure;
+      }
+    #endif
     if (abs(battery - lastBattery) > 0.1)
     {
     send(voltageMsg.set(battery, 2));
