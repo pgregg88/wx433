@@ -557,7 +557,7 @@ void loop()
        
             #ifdef ENABLE_WX_RACK
               // Send wind data to mySensors gateway loop
-              if (windTimeElapsed > 1000) //delay sending to MySensors GW to save battery
+              if (windTimeElapsed > 30000) //delay sending to MySensors GW to save battery
               {
                 send(windDirMsg.set(currentWindDirection, 1));
                 send(windMsg.set(currentWindSpeed, 1));
@@ -586,62 +586,62 @@ void loop()
             #ifdef ENABLE_POWER_MON
               if (abs(busvoltage1 - lastBusvoltage1) > 0.1) // start lipo channel
               {
-              send(lipoBusVoltMsg.set(busvoltage1, 1));
+              send(lipoBusVoltMsg.set(busvoltage1, 2));
               lastBusvoltage1 = busvoltage1;
               }
-              if (abs(shuntvoltage1 - lastShuntvoltage1) > 0.1)
+              if (abs(shuntvoltage1 - lastShuntvoltage1) > 0.5)
               {
-              send(lipoShuntVoltMsg.set(shuntvoltage1, 1));
+              send(lipoShuntVoltMsg.set(shuntvoltage1, 2));
               lastShuntvoltage1 = shuntvoltage1;
               }
               if (abs(loadvoltage1 - lastLoadvoltage1) > 0.1)
               {
-              send(lipoLoadVoltMsg.set(loadvoltage1, 1));
+              send(lipoLoadVoltMsg.set(loadvoltage1, 2));
               lastLoadvoltage1 = loadvoltage1;
               }
-              if (abs(current_mA1 - lastCurrent_mA1) > 0.1)
+              if (abs(current_mA1 - lastCurrent_mA1) > 3)
               {
-              send(lipoCurrentMsg.set(current_mA1, 1));
+              send(lipoCurrentMsg.set(current_mA1, 2));
               lastCurrent_mA1 = current_mA1;
               }
               if (abs(busvoltage2 - lastBusvoltage2) > 0.1) // start solar channel
               {
-              send(solarBusVoltMsg.set(busvoltage2, 1));
+              send(solarBusVoltMsg.set(busvoltage2, 2));
               lastBusvoltage2 = busvoltage2;
               }
-              if (abs(shuntvoltage2 - lastShuntvoltage2) > 0.1)
+              if (abs(shuntvoltage2 - lastShuntvoltage2) > 0.5)
               {
-              send(solarShuntVoltMsg.set(shuntvoltage2, 1));
+              send(solarShuntVoltMsg.set(shuntvoltage2, 2));
               lastShuntvoltage2 = shuntvoltage2;
               }
               if (abs(loadvoltage2 - lastLoadvoltage2) > 0.1)
               {
-              send(solarLoadVoltMsg.set(loadvoltage2, 1));
+              send(solarLoadVoltMsg.set(loadvoltage2, 2));
               lastLoadvoltage2 = loadvoltage2;
               }
-              if (abs(current_mA2 - lastCurrent_mA2) > 0.1)
+              if (abs(current_mA2 - lastCurrent_mA2) > 3)
               {
-              send(solarCurrentMsg.set(current_mA2, 1));
+              send(solarCurrentMsg.set(current_mA2, 2));
               lastCurrent_mA2 = current_mA2;
               }
               if (abs(busvoltage3 - lastBusvoltage3) > 0.1) // start arduino output channel
               {
-              send(outputBusVoltMsg.set(busvoltage3, 1));
+              send(outputBusVoltMsg.set(busvoltage3, 2));
               lastBusvoltage3 = busvoltage3;
               }
-              if (abs(shuntvoltage3 - lastShuntvoltage3) > 0.1)
+              if (abs(shuntvoltage3 - lastShuntvoltage3) > 0.5)
               {
-              send(outputShuntVoltMsg.set(shuntvoltage3, 1));
+              send(outputShuntVoltMsg.set(shuntvoltage3, 2));
               lastShuntvoltage3 = shuntvoltage3;
               }
               if (abs(loadvoltage3 - lastLoadvoltage3) > 0.1)
               {
-              send(outputLoadVoltMsg.set(loadvoltage3, 1));
+              send(outputLoadVoltMsg.set(loadvoltage3, 2));
               lastLoadvoltage3 = loadvoltage3;
               }
-              if (abs(current_mA3 - lastCurrent_mA3) > 0.1)
+              if (abs(current_mA3 - lastCurrent_mA3) > 3)
               {
-              send(outputCurrentMsg.set(current_mA3, 1));
+              send(outputCurrentMsg.set(current_mA3, 2));
               lastCurrent_mA3 = current_mA3;
               }
             #endif
