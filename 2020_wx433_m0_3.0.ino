@@ -110,28 +110,13 @@ volatile bool awakeFlag = false;
   unsigned long sleepTime = 300000; // Update every 5 minutes
 #endif
 
-float lastTemperature = 0;
-float lastPressure = 0;
-float lastHumidity = 0;
-float lastBattery = 0;
+float lastTemperature;
+float lastPressure;
+float lastHumidity;
 
-float lastBusvoltage1 = 0;
-float lastShuntvoltage1 = 0;
-float lastLoadvoltage1 = 0;
-float lastCurrent_mA1 = 0;
-bool lastLipoCharging = 0;
-
-float lastBusvoltage2 = 0;
-float lastShuntvoltage2 = 0;
-float lastLoadvoltage2 = 0;
-float lastCurrent_mA2 = 0;
-bool lastSolarActive = 0;
-
-float lastBusvoltage3 = 0;
-float lastShuntvoltage3 = 0;
-float lastLoadvoltage3 = 0;
-float lastCurrent_mA3 = 0;
-bool lastOutputActive = 0;
+float lipoVoltage;
+float lastLipoVoltage;
+float lipoVoltagePercentage;
 
 #ifdef ENABLE_MYSENSORS
   // Only use one variable type per child
@@ -173,6 +158,7 @@ bool lastOutputActive = 0;
   elapsedMillis rainTimeElapsed; //declare global if you don't want it reset every time loop runs
   elapsedMillis rainTime24Hours;
   elapsedMillis windTimeElapsed; //declare global if you don't want it reset every time loop runs
+  elapsedMillis battTimeElapsed;
 
 #ifdef ENABLE_WX_RACK
   // Example: SDL_Weather_80422(int pinAnem, int pinRain, int intAnem, int intRain, int ADChannel, int ADMode);
@@ -184,7 +170,7 @@ bool lastOutputActive = 0;
   bool rainingNow;
   float rain24Hours;
 
-#endif
+#endif 
 
 #ifdef ENABLE_POWER_MON
   // Battery and Solar Cell management
@@ -193,6 +179,9 @@ bool lastOutputActive = 0;
   #define LIPO_BATTERY_CHANNEL 1
   #define SOLAR_CELL_CHANNEL 2
   #define OUTPUT_CHANNEL 3
+  #define BATTV_HIGH 4.2 //lipo max voltage
+  #define BATTV_LOW 3.6 //lipo min voltage
+  #define BATTV_SPREAD .6 // BATTV_HIGH - BATTV_LOW = BATTV_SPREAD
   bool lipoCharging;
   bool solarActive;
   bool outputActive;
@@ -205,6 +194,7 @@ bool lastOutputActive = 0;
   #endif
 #endif
 
+// ============== SETUP ================================================================================
 void setup()
 {
   /*
@@ -242,6 +232,10 @@ void setup()
   myBME280.settings.humidOverSample = 2;
 
   myBME280.setMode(MODE_SLEEP); //Sleep for now
+
+  lastTemperature = 0;
+  lastPressure = 0;
+  lastHumidity = 0;
 #endif
 
 #ifdef ENABLE_WX_RACK
@@ -256,6 +250,9 @@ void setup()
   
 #endif
 
+
+
+
 #ifdef ENABLE_POWER_MON
   // Battery and Solar Cell management
   #ifdef DEBUG
@@ -263,6 +260,13 @@ void setup()
     Serial.println("Measuring voltage and current with ina3221 ...");
     
   #endif
+
+  lipoCharging = 0;
+  solarActive = 0;
+  outputActive = 0;
+
+  lipoVoltage = 0;
+  lastLipoVoltage = 0;
 
   ina3221.begin();  
 
@@ -309,10 +313,11 @@ void setup()
     present(RAINDAILY_CHILD, S_RAIN, "wx433 Daily Rain Inches " );
     present(RAINING_NOW_CHILD,S_BINARY, "Raining now? ");
     present(RAIN_24_HOURS_CHILD, S_RAIN, "wx433 Rain in the last 24 hours " );
+    //metric = getControllerConfig().isMetric;
   }
 #endif
 
-// ***** **** **** LOOP **** **** ****
+// ============== LOOP ================================================================================
 
 void loop()
 {
@@ -361,7 +366,9 @@ void loop()
       float busvoltage1 = 0;
       float current_mA1 = 0;
       float loadvoltage1 = 0;
-      bool  lipoCharging = 0;
+      float lipoVoltageReaming =0;
+      lipoCharging = 0;
+      lipoVoltage = 0;
 
       busvoltage1 = ina3221.getBusVoltage_V(LIPO_BATTERY_CHANNEL);
       shuntvoltage1 = ina3221.getShuntVoltage_mV(LIPO_BATTERY_CHANNEL);
@@ -374,10 +381,15 @@ void loop()
         {
           lipoCharging = 0;
         }
+
+      lipoVoltage = ina3221.getBusVoltage_V(LIPO_BATTERY_CHANNEL);
+      lipoVoltageReaming = (abs(BATTV_HIGH - lipoVoltage));
+      lipoVoltagePercentage = (abs((BATTV_SPREAD-lipoVoltageReaming)/BATTV_SPREAD)*100);
       
     
       #ifdef DEBUG
         Serial.print("LIPO_Battery Bus Voltage:   "); Serial.print(busvoltage1); Serial.println(" V");
+        Serial.print("LIPO_Battery Bus %:         "); Serial.print(lipoVoltagePercentage); Serial.println(" V");
         Serial.print("LIPO_Battery Shunt Voltage: "); Serial.print(shuntvoltage1); Serial.println(" mV");
         Serial.print("LIPO_Battery Load Voltage:  "); Serial.print(loadvoltage1); Serial.println(" V");
         Serial.print("LIPO_Battery Current 1:     "); Serial.print(current_mA1); Serial.println(" mA");
@@ -403,6 +415,8 @@ void loop()
           {
             solarActive = 0;
           }
+
+      
     
       #ifdef DEBUG
         Serial.print("Solar Cell Bus Voltage 2:   "); Serial.print(busvoltage2); Serial.println(" V");
@@ -506,22 +520,20 @@ void loop()
               {
               send(tempMsg.set(temperature, 1));
               lastTemperature = temperature;
+              sendWindRainValues();
               }
               if (abs(humidity - lastHumidity) > 1.0)
               {
               send(humMsg.set(humidity, 2));
               lastHumidity = humidity;
+              sendWindRainValues();
               }
 
               if (abs(pressure - lastPressure) > 1.0)
               {
               send(pressureMsg.set(pressure, 1));
               lastPressure = pressure;
-              }
-              if (abs(battery - lastBattery) > 0.1)
-              {
-              send(voltageMsg.set(battery, 2));
-              lastBattery = battery;
+              sendWindRainValues();
               }
             #endif
 
@@ -535,6 +547,7 @@ void loop()
                 if (oldRain < rainTotal)
                 {
                   rainingNow = 1;
+                  send(rainingNowMsg.set(rainingNow, 0));
                   #ifdef DEBUG
                   Serial.println( F("It is Raining"));
                   #endif   
@@ -542,8 +555,20 @@ void loop()
                   {
                     rainingNow = 0;
                     rainTimeElapsed = 0;
+                    send(rainingNowMsg.set(rainingNow, 0));
                   }
+              
+              
+              
 
+              if (windTimeElapsed > 60000)
+              {
+                send(windDirMsg.set(currentWindDirection, 1));
+                send(windMsg.set(currentWindSpeed, 1));
+                send(WindGustMsg.set(currentWindGust, 1));
+
+                windTimeElapsed = 0;
+              }
               
               #ifdef DEBUG
                 Serial.print(F(" currentWindSpeed:          ")); Serial.println(currentWindSpeed);
@@ -554,96 +579,36 @@ void loop()
                 Serial.println("");
               #endif
             #endif
-       
-            #ifdef ENABLE_WX_RACK
-              // Send wind data to mySensors gateway loop
-              if (windTimeElapsed > 30000) //delay sending to MySensors GW to save battery
-              {
-                send(windDirMsg.set(currentWindDirection, 1));
-                send(windMsg.set(currentWindSpeed, 1));
-                send(WindGustMsg.set(currentWindGust, 1));
-                send(rainMsg.set(rainTotal, 2)); // needs to be configured for dail total
-                send(rainDailyMsg.set(rainTotal, 2)); // needs to be configured for dail total
-                send(rainingNowMsg.set(rainingNow, 0));
-                send(lipoChargingMsg.set(lipoCharging, 0));
-                send(solarActivegMsg.set(solarActive, 0));
-                send(outputActiveMsg.set(outputActive, 0));
-                // sendBatteryLevel();
-                // sendHeartbeat();
-                // sendSignalStrength();
-                // sendTXPowerLevel();
-                windTimeElapsed = 0;       // reset the counter to 0 so the counting starts over...
-                if (loadvoltage1 >= 0)
-                  {
-                    lipoCharging = 0;
-                  } else
-                    {
-                      lipoCharging = 1;
-                    }
-              }
-            #endif
 
             #ifdef ENABLE_POWER_MON
-              if (abs(busvoltage1 - lastBusvoltage1) > 0.1) // start lipo channel
+              if (abs(lipoVoltage - lastLipoVoltage) > 0.02) // start lipo channel
               {
               send(lipoBusVoltMsg.set(busvoltage1, 2));
-              lastBusvoltage1 = busvoltage1;
+              lastLipoVoltage = busvoltage1;
               }
-              if (abs(shuntvoltage1 - lastShuntvoltage1) > 0.5)
+              
+              if (battTimeElapsed > 300000)
               {
-              send(lipoShuntVoltMsg.set(shuntvoltage1, 2));
-              lastShuntvoltage1 = shuntvoltage1;
+                send(lipoBusVoltMsg.set(busvoltage1, 2));
+                send(lipoShuntVoltMsg.set(shuntvoltage1, 1));
+                send(lipoLoadVoltMsg.set(loadvoltage1, 1));
+                send(lipoCurrentMsg.set(current_mA1, 1));
+                send(lipoChargingMsg.set(lipoCharging, 1));
+                send(solarBusVoltMsg.set(busvoltage2, 1));
+                send(solarShuntVoltMsg.set(shuntvoltage2, 1));
+                send(solarLoadVoltMsg.set(loadvoltage2, 1));
+                send(solarCurrentMsg.set(current_mA2, 1));
+                send(solarActivegMsg.set(solarActive,  1));
+                send(outputBusVoltMsg.set(busvoltage3, 1));
+                send(outputShuntVoltMsg.set(shuntvoltage3, 1));
+                send(outputLoadVoltMsg.set(loadvoltage3, 1));
+                send(outputCurrentMsg.set(current_mA3, 1));
+                send(outputActiveMsg.set(outputActive, 1));
+                sendBatteryLevel(lipoVoltagePercentage);
+                //send(sendHeartbeat( const bool ));
+                battTimeElapsed = 0;
               }
-              if (abs(loadvoltage1 - lastLoadvoltage1) > 0.1)
-              {
-              send(lipoLoadVoltMsg.set(loadvoltage1, 2));
-              lastLoadvoltage1 = loadvoltage1;
-              }
-              if (abs(current_mA1 - lastCurrent_mA1) > 3)
-              {
-              send(lipoCurrentMsg.set(current_mA1, 2));
-              lastCurrent_mA1 = current_mA1;
-              }
-              if (abs(busvoltage2 - lastBusvoltage2) > 0.1) // start solar channel
-              {
-              send(solarBusVoltMsg.set(busvoltage2, 2));
-              lastBusvoltage2 = busvoltage2;
-              }
-              if (abs(shuntvoltage2 - lastShuntvoltage2) > 0.5)
-              {
-              send(solarShuntVoltMsg.set(shuntvoltage2, 2));
-              lastShuntvoltage2 = shuntvoltage2;
-              }
-              if (abs(loadvoltage2 - lastLoadvoltage2) > 0.1)
-              {
-              send(solarLoadVoltMsg.set(loadvoltage2, 2));
-              lastLoadvoltage2 = loadvoltage2;
-              }
-              if (abs(current_mA2 - lastCurrent_mA2) > 3)
-              {
-              send(solarCurrentMsg.set(current_mA2, 2));
-              lastCurrent_mA2 = current_mA2;
-              }
-              if (abs(busvoltage3 - lastBusvoltage3) > 0.1) // start arduino output channel
-              {
-              send(outputBusVoltMsg.set(busvoltage3, 2));
-              lastBusvoltage3 = busvoltage3;
-              }
-              if (abs(shuntvoltage3 - lastShuntvoltage3) > 0.5)
-              {
-              send(outputShuntVoltMsg.set(shuntvoltage3, 2));
-              lastShuntvoltage3 = shuntvoltage3;
-              }
-              if (abs(loadvoltage3 - lastLoadvoltage3) > 0.1)
-              {
-              send(outputLoadVoltMsg.set(loadvoltage3, 2));
-              lastLoadvoltage3 = loadvoltage3;
-              }
-              if (abs(current_mA3 - lastCurrent_mA3) > 3)
-              {
-              send(outputCurrentMsg.set(current_mA3, 2));
-              lastCurrent_mA3 = current_mA3;
-              }
+
             #endif
 
           } else 
@@ -690,9 +655,94 @@ void loop()
       }
     #endif
   }
-  
   // End of Loop
 }
+
+// ============== FUNCTIONS ================================================================================
+void sendWindRainValues()
+{
+  send(windDirMsg.set(currentWindDirection, 1));
+  send(windMsg.set(currentWindSpeed, 1));
+  send(WindGustMsg.set(currentWindGust, 1));
+  send(rainMsg.set(rainTotal, 2)); // needs to be configured for dail total
+  send(rainDailyMsg.set(rainTotal, 2)); // needs to be configured for dail total
+  send(rainingNowMsg.set(rainingNow, 0));
+  send(lipoChargingMsg.set(lipoCharging, 0));
+  send(solarActivegMsg.set(solarActive, 0));
+  send(outputActiveMsg.set(outputActive, 0));
+  // sendBatteryLevel();
+  // sendHeartbeat();
+  // sendSignalStrength();
+  // sendTXPowerLevel();       
+}
+
+// void sendAllSensorValues()
+// {
+//   send(tempMsg.set(temperature, 1));
+//   send(pressureMsg.set(pressure, 1));
+//   send(lipoBusVoltMsg.set(busvoltage1, 2));
+//   send(lipoShuntVoltMsg.set(shuntvoltage1, 1));
+//   send(lipoLoadVoltMsg.set(loadvoltage1, 1));
+//   send(lipoCurrentMsg.set(current_mA1, 1));
+//   send(lipoChargingMsg.set(lipoCharging, 1));
+//   send(solarBusVoltMsg.set(busvoltage2, 1));
+//   send(solarShuntVoltMsg.set(shuntvoltage2, 1));
+//   send(solarLoadVoltMsg.set(loadvoltage2, 1));
+//   send(solarCurrentMsg.set(current_mA2, 1));
+//   send(solarActivegMsg.set(solarActive,  1));
+//   send(outputBusVoltMsg.set(busvoltage3, 1));
+//   send(outputShuntVoltMsg.set(shuntvoltage3, 1));
+//   send(outputLoadVoltMsg.set(loadvoltage3, 1));
+//   send(outputCurrentMsg.set(current_mA3, 1));
+//   send(outputActiveMsg.set(outputActive, 1));
+//   send(windDirMsg.set(currentWindDirection, 1));
+//   send(windMsg.set(currentWindSpeed, 1));
+//   send(WindGustMsg.set(currentWindGust, 1));
+//   send(rainMsg.set(rainTotal, 2)); // needs to be configured for dail total
+//   send(rainDailyMsg.set(rainTotal, 2)); // needs to be configured for dail total
+//   send(rainingNowMsg.set(rainingNow, 0));    
+//   send(voltageMsg.set(battery, 2));
+//   send(lipoChargingMsg.set(lipoCharging, 0));
+//   send(solarActivegMsg.set(solarActive, 0));
+//   send(outputActiveMsg.set(outputActive, 0));
+//   // sendBatteryLevel();
+//   // sendHeartbeat();
+//   // sendSignalStrength();
+//   // sendTXPowerLevel();       
+// }
+
+// void sendAllSensorValues()
+// {
+//   send(lipoBusVoltMsg.set(busvoltage1, 2));
+//   send(lipoLoadVoltMsg.set(loadvoltage1, 1));
+//   send(lipoCurrentMsg.set(current_mA1, 1));
+//   send(lipoChargingMsg.set(lipoCharging, 1));
+//   send(solarBusVoltMsg.set(busvoltage2, 1));
+//   send(solarLoadVoltMsg.set(loadvoltage2, 1));
+//   send(solarCurrentMsg.set(current_mA2, 1));
+//   send(solarActivegMsg.set(solarActive,  1));
+//   send(outputBusVoltMsg.set(busvoltage3, 1));
+//   send(outputLoadVoltMsg.set(loadvoltage3, 1));
+//   send(outputCurrentMsg.set(current_mA3, 1));
+//   send(outputActiveMsg.set(outputActive, 1));
+//   send(windDirMsg.set(currentWindDirection, 1));
+//   send(windMsg.set(currentWindSpeed, 1));
+//   send(WindGustMsg.set(currentWindGust, 1));
+//   send(rainMsg.set(rainTotal, 2)); // needs to be configured for dail total
+//   send(rainDailyMsg.set(rainTotal, 2)); // needs to be configured for dail total
+//   send(rainingNowMsg.set(rainingNow, 0));    
+//   send(voltageMsg.set(battery, 2));
+//   send(lipoChargingMsg.set(lipoCharging, 0));
+//   send(solarActivegMsg.set(solarActive, 0));
+//   send(outputActiveMsg.set(outputActive, 0));
+//   // sendBatteryLevel();
+//   // sendHeartbeat();
+//   // sendSignalStrength();
+//   // sendTXPowerLevel();       
+// }
+
+
+
 
 void awake()
 {

@@ -2,6 +2,6 @@
     "sketch": "2020_wx433_m0_3.0.ino",
     "board": "Moteino:samd:moteino_m0",
     "configuration": "crystal=external,usbstack=arduino,debug=off",
-    "port": "/dev/tty.usbmodem31201",
+    "port": "/dev/tty.usbmodem21201",
     "output": "../ArduinoOutput"
 }
