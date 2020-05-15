@@ -247,6 +247,8 @@ void setup()
   rainingNow = 0;
   windTimeElapsed = 0;
   rain24Hours = 0;
+
+  
   
 #endif
 
@@ -382,10 +384,10 @@ void loop()
           lipoCharging = 0;
         }
 
-      lipoVoltage = ina3221.getBusVoltage_V(LIPO_BATTERY_CHANNEL);
-      lipoVoltageReaming = (abs(BATTV_HIGH - lipoVoltage));
-      lipoVoltagePercentage = (abs((BATTV_SPREAD-lipoVoltageReaming)/BATTV_SPREAD)*100);
-      
+      lipoVoltage = analogRead(A5);
+      lipoVoltagePercentage = lipoVoltage / 10;
+
+     
     
       #ifdef DEBUG
         Serial.print("LIPO_Battery Bus Voltage:   "); Serial.print(busvoltage1); Serial.println(" V");
@@ -395,6 +397,8 @@ void loop()
         Serial.print("LIPO_Battery Current 1:     "); Serial.print(current_mA1); Serial.println(" mA");
         Serial.print("LIPO Charging:              "); Serial.println(lipoCharging); 
         Serial.println("");
+        Serial.print("Raw Voltage:   "); Serial.print(lipoVoltage); Serial.println(" V");
+        Serial.print("Raw Voltage: %  "); Serial.print(lipoVoltagePercentage); Serial.println(" %");
       #endif
 
       float shuntvoltage2 = 0;
@@ -561,7 +565,7 @@ void loop()
               
               
 
-              if (windTimeElapsed > 60000)
+              if (windTimeElapsed > 1800000)
               {
                 send(windDirMsg.set(currentWindDirection, 1));
                 send(windMsg.set(currentWindSpeed, 1));
@@ -581,29 +585,21 @@ void loop()
             #endif
 
             #ifdef ENABLE_POWER_MON
-              if (abs(lipoVoltage - lastLipoVoltage) > 0.02) // start lipo channel
+
+              if (battTimeElapsed > 1800000)
               {
-              send(lipoBusVoltMsg.set(busvoltage1, 2));
-              lastLipoVoltage = busvoltage1;
-              }
-              
-              if (battTimeElapsed > 300000)
-              {
-                send(lipoBusVoltMsg.set(busvoltage1, 2));
-                send(lipoShuntVoltMsg.set(shuntvoltage1, 1));
-                send(lipoLoadVoltMsg.set(loadvoltage1, 1));
-                send(lipoCurrentMsg.set(current_mA1, 1));
-                send(lipoChargingMsg.set(lipoCharging, 1));
-                send(solarBusVoltMsg.set(busvoltage2, 1));
-                send(solarShuntVoltMsg.set(shuntvoltage2, 1));
-                send(solarLoadVoltMsg.set(loadvoltage2, 1));
-                send(solarCurrentMsg.set(current_mA2, 1));
-                send(solarActivegMsg.set(solarActive,  1));
-                send(outputBusVoltMsg.set(busvoltage3, 1));
-                send(outputShuntVoltMsg.set(shuntvoltage3, 1));
-                send(outputLoadVoltMsg.set(loadvoltage3, 1));
-                send(outputCurrentMsg.set(current_mA3, 1));
-                send(outputActiveMsg.set(outputActive, 1));
+                send(lipoBusVoltMsg.set(busvoltage1, 3));
+                send(lipoLoadVoltMsg.set(loadvoltage1, 3));
+                send(lipoCurrentMsg.set(current_mA1, 3));
+                send(lipoChargingMsg.set(lipoCharging, 0));
+                send(solarBusVoltMsg.set(busvoltage2, 3));
+                send(solarLoadVoltMsg.set(loadvoltage2, 3));
+                send(solarCurrentMsg.set(current_mA2, 3));
+                send(solarActivegMsg.set(solarActive,  0));
+                send(outputBusVoltMsg.set(busvoltage3, 3));
+                send(outputLoadVoltMsg.set(loadvoltage3, 3));
+                send(outputCurrentMsg.set(current_mA3, 3));
+                send(outputActiveMsg.set(outputActive, 0));
                 sendBatteryLevel(lipoVoltagePercentage);
                 //send(sendHeartbeat( const bool ));
                 battTimeElapsed = 0;
